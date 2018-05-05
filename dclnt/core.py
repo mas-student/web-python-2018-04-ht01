@@ -1,42 +1,74 @@
 import ast
 import os
 import collections
+from operator import itemgetter
 
 from nltk import pos_tag
 
 
+fixture1 = '''
+name_1 = 'abc'
+thing2 = 63
+__left = '1'
+right__ = '2'
+__both__ = '3'
+
+def do_staff():
+    pass
+
+def make_him():
+    pass
+
+'''
+
+
 def flat(_list):
-    """ [(1,2), (3,4)] -> [1, 2, 3, 4]"""
+    '''
+        return flattened list that consists elememts of all subllists of _list
+
+        >>> flat([(1,2), (3,4)])
+        [1, 2, 3, 4]
+    '''
     return sum([list(item) for item in _list], [])
 
 
 def is_verb(word):
+    '''
+        >>> is_verb('do')
+        True
+        >>> is_verb('hello')
+        False
+    '''
     if not word:
         return False
     pos_info = pos_tag([word])
     return pos_info[0][1] == 'VB'
 
-Path = ''
+def get_tree_from_content(content):
+    try:
+        return ast.parse(content)
+    except SyntaxError as e:
+        print(e)
 
-def get_trees(_path, with_filenames=False, with_file_content=False):
+def get_filenames_by_ext(path, ext, limit):
     filenames = []
-    trees = []
-    path= Path
     for dirname, dirs, files in os.walk(path, topdown=True):
         for file in files:
-            if file.endswith('.py'):
+            if file.endswith(ext):
                 filenames.append(os.path.join(dirname, file))
-                if len(filenames) == 100:
+                if len(filenames) >= limit:
                     break
-    print('total %s files' % len(filenames))
+    return filenames
+
+def get_trees(path, with_filenames=False, with_file_content=False, limit=100):
+    trees = []
+
+    filenames = get_filenames_by_ext(path, '.py', limit)
+
     for filename in filenames:
         with open(filename, 'r', encoding='utf-8') as attempt_handler:
             main_file_content = attempt_handler.read()
-        try:
-            tree = ast.parse(main_file_content)
-        except SyntaxError as e:
-            print(e)
-            tree = None
+        tree = get_tree_from_content(main_file_content)
         if with_filenames:
             if with_file_content:
                 trees.append((filename, main_file_content, tree))
@@ -44,54 +76,102 @@ def get_trees(_path, with_filenames=False, with_file_content=False):
                 trees.append((filename, tree))
         else:
             trees.append(tree)
-    print('trees generated')
     return trees
 
 
 def get_all_names(tree):
+    '''
+        >>> get_all_names(ast.parse('a = 1\\nb = 17\\n'))
+        ['a', 'b']
+    '''
     return [node.id for node in ast.walk(tree) if isinstance(node, ast.Name)]
 
+def split_snake_case_name_to_words(name):
+    '''
+        >>> list(split_snake_case_name_to_words('left_right'))
+        ['left', 'right']
+    '''
+    return filter(not_not, name.split('_'))
 
 def get_verbs_from_function_name(function_name):
-    return [word for word in function_name.split('_') if is_verb(word)]
+    '''
+        >>> list(get_verbs_from_function_name('take_this_thing'))
+        ['take']
+    '''
+    return filter(is_verb, split_snake_case_name_to_words(function_name))
 
+def not_not(value):
+    return not not value
+
+def not_dunder(name):
+    '''
+        >>> not_dunder('value')
+        True
+        >>> not_dunder('__value')
+        True
+        >>> not_dunder('value__')
+        True
+        >>> not_dunder('__value__')
+        False
+    '''
+    return not (name.startswith('__') and name.endswith('__'))
+
+
+def get_all_words_in_tree(tree):
+    '''
+    >>> get_all_words_in_tree(ast.parse(fixture1))
+    ['name', '1', 'thing2', 'left', 'right']
+
+    :param tree:
+    :return:
+    '''
+    function_names = filter(not_dunder, get_all_names(tree))
+    return flat(map(split_snake_case_name_to_words, function_names))
 
 def get_all_words_in_path(path):
-    trees = [t for t in get_trees(path) if t]
-    function_names = [f for f in flat([get_all_names(t) for t in trees]) if not (f.startswith('__') and f.endswith('__'))]
-    def split_snake_case_name_to_words(name):
-        return [n for n in name.split('_') if n]
-    return flat([split_snake_case_name_to_words(function_name) for function_name in function_names])
+    return flat(map(get_all_words_in_tree, filter(not_not, get_trees(path))))
 
+def get_function_names_in_tree(tree):
+    return [node.name.lower() for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
+
+def get_verbs_in_tree(tree):
+    '''
+    >>> get_verbs_in_tree(ast.parse(fixture1))
+    ['do', 'make']
+    '''
+    all_functions = get_function_names_in_tree(tree)
+    function_names = filter(not_dunder, all_functions)
+    return flat(map(get_verbs_from_function_name, function_names))
+
+def get_verbs_in_path(path):
+    return flat(map(get_verbs_in_tree, filter(not_not, get_trees(path))))
 
 def get_top_verbs_in_path(path, top_size=10):
-    global Path
-    Path = path
-    trees = [t for t in get_trees(None) if t]
-    fncs = [f for f in flat([[node.name.lower() for node in ast.walk(t) if isinstance(node, ast.FunctionDef)] for t in trees]) if not (f.startswith('__') and f.endswith('__'))]
-    print('functions extracted')
-    verbs = flat([get_verbs_from_function_name(function_name) for function_name in fncs])
-    return collections.Counter(verbs).most_common(top_size)
-def get_top_functions_names_in_path(path, top_size=10):
-    t = get_trees(path)
-    nms = [f for f in flat([[node.name.lower() for node in ast.walk(t) if isinstance(node, ast.FunctionDef)] for t in t]) if not (f.startswith('__') and f.endswith('__'))]
-    return collections.Counter(nms).most_common(top_size)
+    verbs = get_verbs_in_path(path)
+    result = collections.Counter(verbs).most_common()
+    result = sorted(result, key=itemgetter(0))
+    result = sorted(result, key=itemgetter(1), reverse=True)
+    result = result[:top_size]
+    return result
 
+def main():
+    wds = []
+    projects = [
+        'django',
+        'flask',
+        'pyramid',
+        'reddit',
+        'requests',
+        'sqlalchemy',
+    ]
+    for project in projects:
+        path = os.path.join('.', project)
+        wds += get_top_verbs_in_path(path)
 
-wds = []
-projects = [
-    'django',
-    'flask',
-    'pyramid',
-    'reddit',
-    'requests',
-    'sqlalchemy',
-]
-for project in projects:
-    path = os.path.join('.', project)
-    wds += get_top_verbs_in_path(path)
+    top_size = 200
+    print('total %s words, %s unique' % (len(wds), len(set(wds))))
+    for word, occurence in collections.Counter(wds).most_common(top_size):
+        print(word, occurence)
 
-top_size = 200
-print('total %s words, %s unique' % (len(wds), len(set(wds))))
-for word, occurence in collections.Counter(wds).most_common(top_size):
-    print(word, occurence)
+if __name__ == "__main__":
+    main()
