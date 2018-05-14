@@ -15,10 +15,6 @@ def get_top_function_name_verbs_in_path(path, top_size=10):
     return collections.Counter(verbs).most_common(top_size)
 
 def main():
-    '''
-    >>> main()
-    None
-    '''
     projects = [
         'django',
         'flask',
