@@ -4,7 +4,7 @@ from os.path import join, dirname
 import os
 
 setup(
-    name='dclnt',
+    name='grammaranalyzer',
     version='1.0',
     packages=find_packages(),
     long_description=open(join(dirname(__file__), 'README.md')).read(),

@@ -1,6 +1,6 @@
-# Dclnt
+# Grammar analyzer
 
-Dclnt is the library that find most frequently verbs in python projects.
+Grammar analyzer is the library that find most frequently verbs in python projects.
 
 ## Prerequisites
 
@@ -43,8 +43,9 @@ pip install -r requirements.txt
 Try example
 
 ```
->>> import dclnt
->>> dclnt.get_top_verbs_in_path(/path/to/your/project')
+>>> import grammaranalyzer
+>>> grammaranalyzer.get_top_function_name_verbs_in_path('flask')
+[('get', 58), ('add', 34), ('make', 16), ('run', 16), ('find', 8), ('expect', 3), ('save', 3), ('do', 2), ('keep', 2), ('finalize', 1)]
 ```
 
 ## Running the tests
