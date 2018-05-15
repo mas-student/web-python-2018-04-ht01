@@ -23,17 +23,19 @@ def main():
         'requests',
         'sqlalchemy',
     ]
+    total_counter = collections.Counter()
     total_top_verbs = []
     for project in projects:
         path = os.path.join('..', project)
 
-        top_verbs = get_top_function_name_verbs_in_path(path)
-        total_top_verbs += top_verbs
+        occurances = list(get_top_function_name_verbs_in_path(path))
+        total_counter.update(dict(occurances))
+        total_top_verbs += map(itemgetter(0), occurances)
 
     top_size = 200
     print('total %s words, %s unique' % (len(total_top_verbs), len(set(total_top_verbs))))
-    for word, occurence in collections.Counter(total_top_verbs).most_common(top_size):
-        print(word, occurence)
+    for word, occurence in total_counter.most_common(top_size):
+        print(word, occurence)     
 
 if __name__ == "__main__":
     main()
